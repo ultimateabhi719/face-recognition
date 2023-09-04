@@ -176,7 +176,7 @@ def param_optimizer(model_params, data_params, train_params, device):
     for key, value in trial.params.items():
         print("    {}: {}".format(key, value))
 
-def main(model_params, data_params, train_params, device, mode, save_testimg=True):
+def main(model_params, data_params, train_params, device, mode, save_testing=True):
     loss_fn = ContrastiveLoss().to(device)
     # loss_fn = LearnedLoss().to(device)
     net = SiameseNetwork(**model_params).to(device)
@@ -213,10 +213,10 @@ def main(model_params, data_params, train_params, device, mode, save_testimg=Tru
         logwriter.close()
 
     test_dataset = SiameseDataset(data_params['test_datapath'], len_factor=data_params['testdata_multfactor'])
-    test_dataloader = DataLoader(test_dataset, shuffle=False, pin_memory=False, num_workers=2, batch_size=1 if save_testimg else train_params['batch_size'])
+    test_dataloader = DataLoader(test_dataset, shuffle=False, pin_memory=False, num_workers=2, batch_size=1 if save_testing else train_params['batch_size'])
 
     test_folder = None
-    if save_testimg:
+    if save_testing:
         test_folder = os.path.join(train_params['save_prefix'], 'test_images')
         os.makedirs(test_folder)
     test_loss, test_acc, test_rocauc, test_thresh = evaluate_loss(test_dataloader, net, loss_fn, device, logwriter=None, saveimg_folder = test_folder)
@@ -238,7 +238,7 @@ if __name__ == "__main__":
     #                'testdata_multfactor':.2}
 
     data_params = {'train_datapath':('data/celebA/Img/img_align_celeba','data/celebA/identity_CelebA_filt.train.csv'),
-                   'traindata_multfactor':0.05,
+                   'traindata_multfactor':0.6,
                    'val_datapath':('data/celebA/Img/img_align_celeba','data/celebA/identity_CelebA_filt.val.csv'),
                    'valdata_multfactor':1,
                    'test_datapath':('data/celebA/Img/img_align_celeba','data/celebA/identity_CelebA_filt.test.csv'),
@@ -247,7 +247,7 @@ if __name__ == "__main__":
 
     train_params = {'batch_size':648,
                     'resume_dir':None,
-                    'save_prefix':"runs/params_optimizer",
+                    'save_prefix':"runs/celebA_1layerSiam",
                     'epochs':10,
                     'save_freq':1000,
 
@@ -255,7 +255,7 @@ if __name__ == "__main__":
                     'save_loss':"loss_epoch{}_batch{}.pth"
                    }
 
-    device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+    device = 'cuda:1' if torch.cuda.is_available() else 'cpu'
 
     parser = argparse.ArgumentParser(prog='main', description='Train/Test Siamese Network')
     parser.add_argument('mode', default='train', choices=['train', 'eval', 'optimize']) 

@@ -10,8 +10,7 @@ from transformers import ResNetForImageClassification
 
 class LearnedLoss(torch.nn.Module):
     """
-    Contrastive loss function.
-    Based on: http://yann.lecun.com/exdb/publis/pdf/hadsell-chopra-lecun-06.pdf
+    Learned loss function
     """
 
     def __init__(self):
@@ -54,20 +53,19 @@ class ContrastiveLoss(torch.nn.Module):
 
 
 class SiameseNetwork(nn.Module):
-    def __init__(self, model_path = "microsoft/resnet-50", freeze_last_stage = False, fc_dim=500, out_dim = 32):
+    def __init__(self, model_path = "microsoft/resnet-50", stages_resnet=3, fc_dim=500, out_dim = 32):
         super(SiameseNetwork, self).__init__()
-        self.cnn = ResNetForImageClassification.from_pretrained(model_path).resnet
+        resnet_cnn = ResNetForImageClassification.from_pretrained(model_path).resnet
 
-        for param in self.cnn.embedder.parameters():
-            param.requires_grad_(False);            
-        for i in range(3):
-            for param in self.cnn.encoder.stages[i].parameters():
-                param.requires_grad_(False);
-        if freeze_last_stage:
-            for i in range(2):
-                for param in self.cnn.encoder.stages[3].layers[i].parameters():
-                    param.requires_grad_(False);
-            
+        self.pretrained_cnn = nn.Sequential(*([resnet_cnn.embedder]+[resnet_cnn.encoder.stages[s] for s in range(stages_resnet)]) )
+        for param in self.pretrained_cnn.parameters():
+            param.requires_grad_(False); 
+
+        # self.siamese_cnn = nn.Sequential(*[resnet_cnn.encoder.stages[s] for s in range(stages_resnet,len(resnet_cnn.encoder.stages))])
+        self.siamese_cnn = nn.Sequential(*[resnet_cnn.encoder.stages[stages_resnet].layers[0], nn.AdaptiveAvgPool2d(output_size=(1, 1))])
+
+        self.cnn = nn.Sequential(self.pretrained_cnn, self.siamese_cnn)
+
         self.fc1 = nn.Sequential(
             nn.Linear(2048, fc_dim),
             nn.ReLU(inplace=True),
@@ -78,7 +76,7 @@ class SiameseNetwork(nn.Module):
             nn.Linear(fc_dim, out_dim))
 
     def forward_once(self, x):
-        output = self.cnn(x).pooler_output
+        output = self.cnn(x)
         output = output.view(output.size()[0], -1)
         output = self.fc1(output)
         return output
